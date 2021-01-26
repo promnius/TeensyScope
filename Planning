@@ -1,0 +1,74 @@
+number of channels X8 pins each- 8 would be great, 6 acceptable
+external trigger? filter?
+display? how big? inputs? touchscreen? all through the computer? a second teensy to monitor a screen and be a master unit?
+usb connection to host computer (already available)
+can use USB power- useful to also have power header or battery header? or make these part of 'display' board that connects
+
+
+PINS: 42 breadboard, 7 smt, 6 SD. 
+need 48 for 6 channels . . . or we can use SN74CBT16233 to half that number.
+	but do we want 10 bit ADCs?
+2-4 for port expander, which can control status LEDs, range selector switches, CS pins for PGAs, etc.
+
+For a teensy 4.0: 34 easily accessable pins, could be 30 for 6x 10 bit channels with external mux, 4 for SPI port expander, everything else off of that?
+	Nope, doesn't work- the external mux needs high speed control. and may need other CS pins for DAC, etc.
+
+for the channels:
+jumpers to select (would switches be better?)
+- gain range (input resistor divider good enough?)
+- couple in loading, to enable current measurement- with XT30 for high current mode and pin headers for low current mode
+
+amplifier with input series resistance to handle overvoltage.
+- jumper to set range to enable high gain for current measurement
+- must be very high speed
+
+input filter to prevent anti-aliasing
+-bias resistors to set range? or ground one of the inputs?
+
+iso power and comms
+
+bannana plugs, .1" headers, scope probe bnc terminals? anything else? direct MT-60/ XT-60 for current/ voltage? how to manage?
+
+voltage regulator- is precision reference needed?
+negative rail? split and buffer positive rail? cap invert raw rail, then second regulator for negative rail? what can the ADC handle?
+
+AC coupling/ common mode rejection? how to get good resolution measurement of ripple?
+
+Do we add a floating function generator/ DAC as well??????
+how many pins do we need for this????
+SPI dac? - medium speed updates, maybe in the 1Mhz range? so 10-50khz sine waves? faster options?
+variable voltage ranges?
+
+50 ohm term?
+
+CONSIDER loading the amps with resistance to ground to keep the response linear at all frequencies, maybe 500 ohms
+
+AMPLIFIER SELECTION:
+input buffer: 
+LMP7717MF is 5V, 88mhz (only 35V/uS), .1pA (25 over temp), 10uV (150 max, 500 max over temp, but looks typically better than this). NOT rail to rail input. NOT UNITY GAIN STABLE without a compensation network.
+OPA810IDR is 5-27V JFET, 70mhz+ (much better -3db/ slew), 2pA (20 max, no temp rating), 100uV (500 max, plus 4-10uV/C, so ~1mV absolute worst case). rail-to-rail in and out, but some caviots: Vdiff needs to be less than 7V
+OPA189IDR is 5-36V ZeroDrift, 14Mhz (so slower, especially if used for gain), .4uV (4uV across temp) 70pA (1nA across temp), NOT rail to rail input. Not great CMRR or PSRR at freqency
+
+
+amplification:
+OPA 859: crazy high GBW (1.8Ghz), but 5mV offset. 5V operation, pA level input
+LMH6611: 2.7-11V, 135Mhz GBW (460V/uS), 74uV offset (2000uV across temp, dependant on lots of things), 6.5uA input, NOT rail to rail input
+OPA836: 5V, 120Mhz GBW (200Mhz -3db, 500V/uS), 65uV offset (400uV max, 750uV max across temp), 650nA input typical (1.5uA across temp), NOT rail to rail input
+
+OR:
+Max9939 PGA, .2 to 157 gain, 2Mhz bandwidth, not great CMRR, 9V/uS, 1.5mV typical, up to 15mV input offset (but trim adjust)
+PGA870, $10, crazy fast. This needs some honest considering still.
+LTC6911 or LTC6912 look to have similar performance to the max 9939. The LTC6911 has more bandwidth at G=1, but the Max9939 is gain adjusted so the bandwidth is the same at all gains, giving it much better performance across all gains.
+the max9939 is also cheaper
+LT1995 gain of 1-8, input offset not great, but bandwidth of 10Mhz (almost including at a gain of 8)
+THS7001/7002 thse are PGAs with 70mhz bandwidth regardless of gain (max gain 10), but cost $8 ($12 for the 7002 which has 2 units). They're pretty nifty parts though:
+	separate pregain amps with their own supply/ control, and separate output stage with external clamp rails, wide input voltage range, and exposed nodes after the preamp
+	to enable external filtering. NOT rail to rail on EITHER end, but designed for 15V split rails so who cares. with preamp gain = 5, this could do gain of 50 (input limited to +-2V)
+	1+2mV typical offset, 7+11 across temp (preamp+pga, so the pga numbers get divided by 2). 2.5uA typical input current, 8 across temp.
+
+so: for low speed but crazy small signal channels, chain OPA189IDRs with small gains. Can have large naitive signal ranges
+for standard 10Mhz channels, a unity gain OPA189 followed by OPA836s in max 5x gain.
+Do we want faster channels? If so, skip the unity gain OPA189 and limit the 839s to x3 gain. They will have lots of leakage. ONLY 5V input.
+simplest way for slow channels is drop a max9939
+simplest way for faster channels is drop a THS7001 (still optionally with OPA189 inputs if ultra small signals need to be amplified)
+best way for ultra perfect channels is maybe a pga870
